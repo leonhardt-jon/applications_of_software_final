@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  webui:
+    build:
+      context: .
+      dockerfile: docker/web_app.Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - currency_network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/data_analytics_server.Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - currency_data:/app/data
+    networks:
+      - currency_network
+
+  updater:
+    build:
+      context: .
+      dockerfile: docker/data_collection.Dockerfile
+    volumes:
+      - currency_data:/app/data
+    networks:
+      - currency_network
+
+networks:
+  currency_network:
+    driver: bridge
+
+volumes:
+  currency_data:

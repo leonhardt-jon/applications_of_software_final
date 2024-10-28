@@ -1,0 +1,5 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Run at midnight on the first day of each month
+0 0 1 * * python /app/src/currency_tracker.py >> /var/log/cron.log 2>&1

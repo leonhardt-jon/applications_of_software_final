@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Exchange Rates</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.10/htmx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center">Currency Exchange Rates</h1>
+        
+        <!-- Latest Rates Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Latest Exchange Rates</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4"
+                 hx-get="http://localhost:5000/api/latest"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+            </div>
+        </div>
+
+        <!-- Currency Selection -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Historical Rates</h2>
+            <select id="currencySelect"
+                    class="w-full p-2 border rounded mb-4"
+                    hx-get="http://localhost:5000/api/currencies"
+                    hx-trigger="load"
+                    hx-target="#currencySelect">
+                <option value="">Select a currency</option>
+            </select>
+            
+            <!-- Chart Container -->
+            <div class="w-full h-96">
+                <canvas id="ratesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        htmx.on('htmx:afterSettle', function(evt) {
+            if (evt.target.id === 'currencySelect') {
+                const select = evt.target;
+                const data = JSON.parse(evt.detail.xhr.response);
+                
+                // Clear existing options
+                select.innerHTML = '<option value="">Select a currency</option>';
+                
+                // Add new options
+                data.forEach(currency => {
+                    const option = document.createElement('option');
+                    option.value = currency;
+                    option.textContent = currency;
+                    select.appendChild(option);
+                });
+            }
+        });
+
+        document.getElementById('currencySelect').addEventListener('change', async function(evt) {
+            const currency = evt.target.value;
+            if (!currency) return;
+
+            const response = await fetch(`http://localhost:5000/api/rates/${encodeURIComponent(currency)}`);
+            const data = await response.json();
+
+            const dates = data.map(item => item.date);
+            const rates = data.map(item => item.rate);
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(document.getElementById('ratesChart'), {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: `Exchange Rate: ${currency}`,
+                        data: rates,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Historical Exchange Rates'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Exchange Rate'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        // Handle latest rates update
+        htmx.on('htmx:afterSettle', function(evt) {
+            if (evt.target.classList.contains('grid')) {
+                const data = JSON.parse(evt.detail.xhr.response);
+                evt.target.innerHTML = data.map(rate => `
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2">${rate.currency}</h3>
+                        <p class="text-lg">${rate.rate}</p>
+                        <p class="text-sm text-gray-600">As of ${new Date(rate.date).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+            }
+        });
+    </script>
+</body>
+</html>
